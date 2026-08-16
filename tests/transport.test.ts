@@ -36,6 +36,23 @@ function fakeServer(options: IHttpRequestOptions, authorization: string | undefi
 	if (authorization !== `Bearer ${EXPECTED_BEARER}`) {
 		return { statusCode: 401, headers: {}, body: JSON.stringify({ error: 'Unauthorized' }) };
 	}
+	// A "user-basic" destination: personal SAP login required, echoed back for the test.
+	const h = (options.headers as Record<string, string>) ?? {};
+	if (url.hostname === 'user-basic.test') {
+		if (!h['X-SAP-Username'] || !h['X-SAP-Password']) {
+			return {
+				statusCode: 401,
+				headers: {},
+				body: JSON.stringify({ error: 'SAP login required', hint: 'send X-SAP-Username' }),
+			};
+		}
+	} else if (h['X-SAP-Username']) {
+		return {
+			statusCode: 400,
+			headers: {},
+			body: JSON.stringify({ error: 'Destination "s22" (authType basic) nimmt keine persönliche SAP-Anmeldung an' }),
+		};
+	}
 	const accept = String((options.headers as Record<string, string>)?.Accept ?? '');
 	if (!accept.includes('application/json') || !accept.includes('text/event-stream')) {
 		return { statusCode: 406, headers: {}, body: '{"jsonrpc":"2.0","error":{"code":-32000,"message":"Not Acceptable"},"id":null}' };
@@ -46,6 +63,9 @@ function fakeServer(options: IHttpRequestOptions, authorization: string | undefi
 		headers: { 'content-type': 'text/event-stream' },
 		body: sse(payload),
 	});
+	if (rpc.method === 'whoami') {
+		return ok({ jsonrpc: '2.0', id: rpc.id, result: { sapUser: h['X-SAP-Username'] ?? null } });
+	}
 	if (rpc.method === 'tools/list') {
 		return ok({
 			jsonrpc: '2.0',
@@ -97,10 +117,14 @@ function fakeServer(options: IHttpRequestOptions, authorization: string | undefi
 }
 
 /** Minimal stand-in for IExecuteFunctions — only what transport.ts touches. */
-function fakeContext(serverUrl: string, token: string | undefined) {
+function fakeContext(
+	serverUrl: string,
+	token: string | undefined,
+	sap: { sapUsername?: string; sapPassword?: string } = {},
+) {
 	return {
 		getNode: () => ({ name: 'GuniWeb SAP', type: 'guniwebSap', typeVersion: 1, position: [0, 0], parameters: {} }),
-		getCredentials: async () => ({ serverUrl, token, timeoutMs: 5000 }),
+		getCredentials: async () => ({ serverUrl, token, timeoutMs: 5000, ...sap }),
 		helpers: {
 			async httpRequestWithAuthentication(_cred: string, options: IHttpRequestOptions) {
 				return fakeServer(options, token ? `Bearer ${token}` : undefined);
@@ -149,6 +173,31 @@ describe('transport against a fake SAP MCP Server', () => {
 		await expect(callTool.call(ctx, 'diagnose', {})).rejects.toThrow(/Failed at stage "auth"/);
 		const result = await callTool.call(ctx, 'diagnose', {}, undefined, { tolerateError: true });
 		expect(result.isError).toBe(true);
+	});
+
+	it('sends the personal SAP login as X-SAP-Username/X-SAP-Password when both are set', async () => {
+		const ctx = fakeContext('http://user-basic.test:8808', EXPECTED_BEARER, {
+			sapUsername: 'MUELLER',
+			sapPassword: 'geheim',
+		});
+		const result = (await mcpRequest.call(ctx, 'whoami')) as { sapUser: string };
+		expect(result.sapUser).toBe('MUELLER');
+	});
+
+	it('explains a missing personal SAP login (401 "SAP login required") in the credential terms', async () => {
+		const ctx = fakeContext('http://user-basic.test:8808', EXPECTED_BEARER);
+		await expect(mcpRequest.call(ctx, 'whoami')).rejects.toThrow(/personal SAP login/);
+	});
+
+	it('surfaces the server message when a personal login is sent to a technical destination (400)', async () => {
+		const ctx = fakeContext(url, EXPECTED_BEARER, { sapUsername: 'MUELLER', sapPassword: 'x' });
+		await expect(mcpRequest.call(ctx, 'whoami')).rejects.toThrow(/400.*persönliche SAP-Anmeldung/);
+	});
+
+	it('does not send SAP headers when only one of user/password is set', async () => {
+		const ctx = fakeContext(url, EXPECTED_BEARER, { sapUsername: 'MUELLER' });
+		const result = (await mcpRequest.call(ctx, 'whoami')) as { sapUser: string | null };
+		expect(result.sapUser).toBeNull();
 	});
 
 	it('reports 404 for a wrong path and connection errors for a wrong host', async () => {

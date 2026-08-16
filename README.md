@@ -32,9 +32,12 @@ The token is printed once; put it into the n8n credential (below). Server setup,
 |---|---|
 | Server URL | Base URL of the server, e.g. `http://sap-mcp:8808` inside Docker or `https://sap-mcp.example.com`. `/mcp` is added automatically. |
 | Access Token | The Bearer token issued on the server (`tokens issue` or `POST /admin/tokens`). It authenticates the request **and** selects the SAP system. |
+| SAP User / SAP Password | **Personal SAP login** — only for destinations the server runs with `authType: "user-basic"`: your own SAP credentials travel with every call and are used for that call only; SAP authorizations and change documents are on you. Leave empty when the destination uses a technical SAP user. |
 | Request Timeout | Per call, default 120 s — keep it above the server's tool timeout (default 30 s). |
 
-"Test credential" performs a `tools/list` round trip: 200 = URL and token are right, 401 = token rejected, connection error = URL or transport wrong.
+"Test credential" performs a `tools/list` round trip: 200 = URL and token are right (and, for `user-basic`, the SAP login was sent), 401 = token rejected or SAP login missing, connection error = URL or transport wrong. Whether SAP accepts the personal login is what *Discovery → Test Connection* tells you.
+
+**Two ways to act in SAP.** With a technical user (destination `authType: "basic"`, `oauth2`, …) the server holds the SAP credentials and every workflow acts as that user. With the personal login (`user-basic`) every person acts as themselves — the recommended setup when several people build workflows against one system. German step-by-step guides: [für Anwender](docs/anleitung-mitarbeiter.md) · [für Administratoren](docs/anleitung-admin.md).
 
 ## Operations
 
@@ -101,7 +104,7 @@ SAP_MCP_URL=http://localhost:8808 SAP_MCP_TOKEN=gsm_… node scripts/smoke-real-
 
 ## Compatibility
 
-Built and linted with `@n8n/node-cli` against n8n `2.x` (`n8n-workflow` peer dependency, `n8nNodesApiVersion: 1`). Requires GuniWeb SAP MCP Server ≥ 0.3.0 in HTTP transport (`--transport http`); the legacy SSE transport is not supported. No runtime dependencies.
+Built and linted with `@n8n/node-cli` against n8n `2.x` (`n8n-workflow` peer dependency, `n8nNodesApiVersion: 1`). Requires GuniWeb SAP MCP Server ≥ 0.3.0 in HTTP transport (`--transport http`), ≥ 0.4.0 for the personal SAP login (`user-basic`); the legacy SSE transport is not supported. No runtime dependencies.
 
 ## Resources
 
@@ -116,7 +119,7 @@ Community: [issues](https://github.com/guniweb/n8n-nodes-guniweb-sap/issues) in 
 
 ## Version history
 
-- **0.1.0** — first release: OData (query/read/create/update/delete/function/batch), Discovery, IDoc, generic Tool resource; credential with connection test.
+- **0.1.0** — first release: OData (query/read/create/update/delete/function/batch), Discovery, IDoc, generic Tool resource; credential with connection test and optional personal SAP login (`user-basic` destinations).
 
 ## License
 

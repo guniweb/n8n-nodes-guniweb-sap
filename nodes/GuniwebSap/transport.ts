@@ -48,13 +48,23 @@ export async function mcpRequest(
 		});
 	}
 	const url = mcpUrl(credentials);
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json',
+		Accept: 'application/json, text/event-stream',
+	};
+	// Personal SAP login (destination authType user-basic): the person's SAP
+	// user and password travel with the request; the server uses them for this
+	// call only. Sent only when both are set, so technical-user setups stay as is.
+	const sapUsername = String(credentials.sapUsername ?? '').trim();
+	const sapPassword = String(credentials.sapPassword ?? '');
+	if (sapUsername && sapPassword) {
+		headers['X-SAP-Username'] = sapUsername;
+		headers['X-SAP-Password'] = sapPassword;
+	}
 	const options: IHttpRequestOptions = {
 		method: 'POST',
 		url,
-		headers: {
-			'Content-Type': 'application/json',
-			Accept: 'application/json, text/event-stream',
-		},
+		headers,
 		body: JSON.stringify(buildJsonRpcRequest(method, params)),
 		json: false,
 		encoding: 'text',
@@ -80,6 +90,18 @@ export async function mcpRequest(
 	}
 
 	if (response.statusCode === 401) {
+		const body = parseJsonLoose(response.body);
+		if (body?.error === 'SAP login required') {
+			throw new NodeOperationError(
+				this.getNode(),
+				'This SAP destination requires your personal SAP login (401).',
+				{
+					description:
+						'Enter your SAP user and SAP password in the credential of this node — the server runs the destination with authType user-basic and does not fall back to a technical user.',
+					itemIndex,
+				},
+			);
+		}
 		throw new NodeOperationError(
 			this.getNode(),
 			'The SAP MCP Server rejected the token (401 Unauthorized).',
@@ -120,10 +142,16 @@ export async function mcpRequest(
 		});
 	}
 	if (response.statusCode >= 400) {
+		const body = parseJsonLoose(response.body);
 		throw new NodeOperationError(
 			this.getNode(),
-			`The SAP MCP Server answered HTTP ${response.statusCode}.`,
-			{ description: bodyPreview(response.body), itemIndex },
+			typeof body?.error === 'string'
+				? `The SAP MCP Server answered HTTP ${response.statusCode}: ${body.error}`
+				: `The SAP MCP Server answered HTTP ${response.statusCode}.`,
+			{
+				description: typeof body?.hint === 'string' ? body.hint : bodyPreview(response.body),
+				itemIndex,
+			},
 		);
 	}
 
@@ -190,6 +218,17 @@ export async function callTool(
 		});
 	}
 	return result;
+}
+
+function parseJsonLoose(body: unknown): Record<string, unknown> | undefined {
+	if (body && typeof body === 'object' && !Array.isArray(body)) return body as Record<string, unknown>;
+	if (typeof body !== 'string') return undefined;
+	try {
+		const parsed = JSON.parse(body);
+		return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function bodyPreview(body: unknown): string | undefined {
