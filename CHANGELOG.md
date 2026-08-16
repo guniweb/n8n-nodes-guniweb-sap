@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Node and credential icon: the GuniWeb tile (orange gradient, the "G" with its connector marks) with a small blue data cube as the SAP hint — no SAP wordmark or logo (trademark).
+- Node and credential icon: the GuniWeb logo (round orange mark with the "G", as on guniweb.de) with a small blue data cube as the SAP hint — no SAP wordmark or logo (trademark).
 
 ## [0.1.0] - 2026-08-16
 
