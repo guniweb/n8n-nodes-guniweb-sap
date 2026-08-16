@@ -90,6 +90,15 @@ Requires the server to run with `--allow-write` and a token without `readOnly`. 
 
 **Anything else:** Resource *Tool* → *List Tools* shows what the server exposes for your token, *Call Tool* runs it with raw JSON arguments.
 
+## Development
+
+```bash
+npm install
+npm run lint && npm test && npm run build
+# smoke run against a real server:
+SAP_MCP_URL=http://localhost:8808 SAP_MCP_TOKEN=gsm_… node scripts/smoke-real-server.mjs
+```
+
 ## Compatibility
 
 Built and linted with `@n8n/node-cli` against n8n `2.x` (`n8n-workflow` peer dependency, `n8nNodesApiVersion: 1`). Requires GuniWeb SAP MCP Server ≥ 0.3.0 in HTTP transport (`--transport http`); the legacy SSE transport is not supported. No runtime dependencies.

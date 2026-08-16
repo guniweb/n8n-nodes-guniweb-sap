@@ -1,122 +1,99 @@
 /**
- * transport.ts against (a) a small fake MCP server that behaves like the
- * GuniWeb SAP MCP Server (SSE answers, Bearer auth, isError tool results) and
- * (b) optionally a real server when SAP_MCP_URL / SAP_MCP_TOKEN are set.
+ * transport.ts against an in-process stand-in for the GuniWeb SAP MCP Server:
+ * the n8n helper `httpRequestWithAuthentication` is replaced by a responder
+ * that answers like the real server does (SSE bodies, Bearer auth, isError
+ * tool results, JSON-RPC errors) — no sockets, no Node built-ins, so the
+ * community-node lint rules apply unchanged to the test code.
  *
- * The n8n execution context is stubbed: `getCredentials`, `getNode` and
- * `helpers.httpRequestWithAuthentication` (implemented with fetch and the
- * subset of IHttpRequestOptions the transport uses).
+ * A smoke run against a real server lives in scripts/smoke-real-server.mjs.
  */
-import { createServer, type Server } from 'node:http';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { IHttpRequestOptions } from 'n8n-workflow';
 import { callTool, listTools, mcpRequest } from '../nodes/GuniwebSap/transport';
 
-const TOKEN = 'gsm_s22_testtoken';
+const EXPECTED_BEARER = 'gsm_s22_fake';
+const BASE = 'http://sap-mcp.test:8808';
+
+interface Reply {
+	statusCode: number;
+	headers: Record<string, string>;
+	body: string;
+}
 
 function sse(payload: unknown): string {
 	return `event: message\ndata: ${JSON.stringify(payload)}\n\n`;
 }
 
-function startFakeServer(): Promise<{ server: Server; url: string }> {
-	const server = createServer((req, res) => {
-		let body = '';
-		req.on('data', (c) => {
-			body += c;
-		});
-		req.on('end', () => {
-			if (req.url !== '/mcp') {
-				res.writeHead(404, { 'Content-Type': 'application/json' });
-				res.end(JSON.stringify({ error: 'Not Found' }));
-				return;
-			}
-			if (req.headers.authorization !== `Bearer ${TOKEN}`) {
-				res.writeHead(401, { 'Content-Type': 'application/json' });
-				res.end(JSON.stringify({ error: 'Unauthorized' }));
-				return;
-			}
-			const accept = String(req.headers.accept ?? '');
-			if (!accept.includes('application/json') || !accept.includes('text/event-stream')) {
-				res.writeHead(406, { 'Content-Type': 'application/json' });
-				res.end(
-					JSON.stringify({
-						jsonrpc: '2.0',
-						error: { code: -32000, message: 'Not Acceptable' },
-						id: null,
-					}),
-				);
-				return;
-			}
-			const rpc = JSON.parse(body);
-			res.writeHead(200, { 'Content-Type': 'text/event-stream' });
-			if (rpc.method === 'tools/list') {
-				res.end(
-					sse({
-						jsonrpc: '2.0',
-						id: rpc.id,
-						result: {
-							tools: [
-								{ name: 'test-connection', title: 'Test SAP Connection', description: 'x\ny' },
-								{ name: 'sap_query', description: 'q' },
-							],
-						},
-					}),
-				);
-				return;
-			}
-			if (rpc.method === 'tools/call') {
-				const { name, arguments: args } = rpc.params;
-				if (name === 'sap_query') {
-					res.end(
-						sse({
-							jsonrpc: '2.0',
-							id: rpc.id,
-							result: {
-								content: [
-									{
-										type: 'text',
-										text: JSON.stringify({ results: [{ id: 1, args }, { id: 2 }], count: 2 }),
-									},
-								],
-							},
-						}),
-					);
-					return;
-				}
-				if (name === 'sap_fail') {
-					res.end(
-						sse({
-							jsonrpc: '2.0',
-							id: rpc.id,
-							result: {
-								isError: true,
-								content: [
-									{ type: 'text', text: JSON.stringify({ error: 'SAP said no', hint: 'Try X' }) },
-								],
-							},
-						}),
-					);
-					return;
-				}
-				res.end(
-					sse({
-						jsonrpc: '2.0',
-						id: rpc.id,
-						error: { code: -32602, message: `Tool ${name} not found` },
-					}),
-				);
-				return;
-			}
-			res.end(sse({ jsonrpc: '2.0', id: rpc.id, error: { code: -32601, message: 'Method not found' } }));
-		});
+/** Behaves like the SAP MCP Server's /mcp endpoint for the cases under test. */
+function fakeServer(options: IHttpRequestOptions, authorization: string | undefined): Reply {
+	const url = new URL(options.url as string);
+	if (url.hostname === 'unreachable.test') {
+		throw new Error('getaddrinfo ENOTFOUND unreachable.test');
+	}
+	if (url.pathname !== '/mcp') {
+		return { statusCode: 404, headers: {}, body: JSON.stringify({ error: 'Not Found' }) };
+	}
+	if (authorization !== `Bearer ${EXPECTED_BEARER}`) {
+		return { statusCode: 401, headers: {}, body: JSON.stringify({ error: 'Unauthorized' }) };
+	}
+	const accept = String((options.headers as Record<string, string>)?.Accept ?? '');
+	if (!accept.includes('application/json') || !accept.includes('text/event-stream')) {
+		return { statusCode: 406, headers: {}, body: '{"jsonrpc":"2.0","error":{"code":-32000,"message":"Not Acceptable"},"id":null}' };
+	}
+	const rpc = JSON.parse(options.body as string);
+	const ok = (payload: unknown): Reply => ({
+		statusCode: 200,
+		headers: { 'content-type': 'text/event-stream' },
+		body: sse(payload),
 	});
-	return new Promise((resolve) => {
-		server.listen(0, '127.0.0.1', () => {
-			const addr = server.address();
-			const port = typeof addr === 'object' && addr ? addr.port : 0;
-			resolve({ server, url: `http://127.0.0.1:${port}` });
+	if (rpc.method === 'tools/list') {
+		return ok({
+			jsonrpc: '2.0',
+			id: rpc.id,
+			result: {
+				tools: [
+					{ name: 'test-connection', title: 'Test SAP Connection', description: 'x\ny' },
+					{ name: 'sap_query', description: 'q' },
+				],
+			},
 		});
-	});
+	}
+	if (rpc.method === 'tools/call') {
+		const { name, arguments: args } = rpc.params;
+		if (name === 'sap_query') {
+			return ok({
+				jsonrpc: '2.0',
+				id: rpc.id,
+				result: {
+					content: [
+						{ type: 'text', text: JSON.stringify({ results: [{ id: 1, args }, { id: 2 }], count: 2 }) },
+					],
+				},
+			});
+		}
+		if (name === 'sap_fail') {
+			return ok({
+				jsonrpc: '2.0',
+				id: rpc.id,
+				result: {
+					isError: true,
+					content: [{ type: 'text', text: JSON.stringify({ error: 'SAP said no', hint: 'Try X' }) }],
+				},
+			});
+		}
+		if (name === 'diagnose') {
+			return ok({
+				jsonrpc: '2.0',
+				id: rpc.id,
+				result: {
+					isError: true,
+					content: [{ type: 'text', text: JSON.stringify({ status: 'failed', failedStage: 'auth', stages: [] }) }],
+				},
+			});
+		}
+		return ok({ jsonrpc: '2.0', id: rpc.id, error: { code: -32602, message: `Tool ${name} not found` } });
+	}
+	return ok({ jsonrpc: '2.0', id: rpc.id, error: { code: -32601, message: 'Method not found' } });
 }
 
 /** Minimal stand-in for IExecuteFunctions — only what transport.ts touches. */
@@ -126,49 +103,27 @@ function fakeContext(serverUrl: string, token: string | undefined) {
 		getCredentials: async () => ({ serverUrl, token, timeoutMs: 5000 }),
 		helpers: {
 			async httpRequestWithAuthentication(_cred: string, options: IHttpRequestOptions) {
-				const headers: Record<string, string> = {
-					...((options.headers as Record<string, string>) ?? {}),
-				};
-				if (token) headers.Authorization = `Bearer ${token}`;
-				const res = await fetch(options.url as string, {
-					method: options.method,
-					headers,
-					body: options.body as string,
-				});
-				const text = await res.text();
-				return {
-					statusCode: res.status,
-					headers: Object.fromEntries(res.headers.entries()),
-					body: text,
-				};
+				return fakeServer(options, token ? `Bearer ${token}` : undefined);
 			},
 		},
 	} as never;
 }
 
 describe('transport against a fake SAP MCP Server', () => {
-	let server: Server;
-	let url: string;
-
-	beforeAll(async () => {
-		({ server, url } = await startFakeServer());
-	});
-	afterAll(async () => {
-		await new Promise<void>((r) => server.close(() => r()));
-	});
+	const url = BASE;
 
 	it('listTools returns the tool descriptors', async () => {
-		const tools = await listTools.call(fakeContext(url, TOKEN));
+		const tools = await listTools.call(fakeContext(url, EXPECTED_BEARER));
 		expect(tools.map((t) => t.name)).toEqual(['test-connection', 'sap_query']);
 	});
 
 	it('accepts a server URL with trailing slash or /mcp suffix', async () => {
-		expect((await listTools.call(fakeContext(`${url}/`, TOKEN))).length).toBe(2);
-		expect((await listTools.call(fakeContext(`${url}/mcp`, TOKEN))).length).toBe(2);
+		expect((await listTools.call(fakeContext(`${url}/`, EXPECTED_BEARER))).length).toBe(2);
+		expect((await listTools.call(fakeContext(`${url}/mcp`, EXPECTED_BEARER))).length).toBe(2);
 	});
 
 	it('callTool sends arguments and returns the tool result', async () => {
-		const result = await callTool.call(fakeContext(url, TOKEN), 'sap_query', { entitySet: 'A' });
+		const result = await callTool.call(fakeContext(url, EXPECTED_BEARER), 'sap_query', { entitySet: 'A' });
 		const text = result.content?.[0]?.text ?? '';
 		expect(JSON.parse(text)).toMatchObject({ count: 2, results: [{ id: 1, args: { entitySet: 'A' } }, { id: 2 }] });
 	});
@@ -179,32 +134,25 @@ describe('transport against a fake SAP MCP Server', () => {
 	});
 
 	it('surfaces isError tool results with the server message', async () => {
-		await expect(callTool.call(fakeContext(url, TOKEN), 'sap_fail', {})).rejects.toThrow(
+		await expect(callTool.call(fakeContext(url, EXPECTED_BEARER), 'sap_fail', {})).rejects.toThrow(
 			/sap_fail: SAP said no — Try X/,
 		);
 	});
 
 	it('surfaces JSON-RPC errors', async () => {
-		await expect(callTool.call(fakeContext(url, TOKEN), 'nope', {})).rejects.toThrow(/-32602.*not found/);
-		await expect(mcpRequest.call(fakeContext(url, TOKEN), 'bogus/method')).rejects.toThrow(/-32601/);
+		await expect(callTool.call(fakeContext(url, EXPECTED_BEARER), 'nope', {})).rejects.toThrow(/-32602.*not found/);
+		await expect(mcpRequest.call(fakeContext(url, EXPECTED_BEARER), 'bogus/method')).rejects.toThrow(/-32601/);
+	});
+
+	it('returns a failed diagnosis as data when tolerateError is set, throws otherwise', async () => {
+		const ctx = fakeContext(url, EXPECTED_BEARER);
+		await expect(callTool.call(ctx, 'diagnose', {})).rejects.toThrow(/Failed at stage "auth"/);
+		const result = await callTool.call(ctx, 'diagnose', {}, undefined, { tolerateError: true });
+		expect(result.isError).toBe(true);
 	});
 
 	it('reports 404 for a wrong path and connection errors for a wrong host', async () => {
-		await expect(listTools.call(fakeContext(`${url}/nope/`, TOKEN))).rejects.toThrow(/404/);
-		await expect(listTools.call(fakeContext('http://127.0.0.1:1', TOKEN))).rejects.toThrow(/Cannot reach/);
-	});
-});
-
-const REAL_URL = process.env.SAP_MCP_URL;
-const REAL_TOKEN = process.env.SAP_MCP_TOKEN;
-
-describe.skipIf(!REAL_URL)('transport against a real GuniWeb SAP MCP Server (SAP_MCP_URL)', () => {
-	it('lists tools and calls test-connection', async () => {
-		const ctx = fakeContext(REAL_URL as string, REAL_TOKEN);
-		const tools = await listTools.call(ctx);
-		expect(tools.some((t) => t.name === 'test-connection')).toBe(true);
-		const result = await callTool.call(ctx, 'test-connection', {}, undefined, { tolerateError: true });
-		expect(result.content?.[0]?.type).toBe('text');
-		expect(JSON.parse(result.content?.[0]?.text ?? '{}')).toHaveProperty('stages');
+		await expect(listTools.call(fakeContext(`${url}/nope/`, EXPECTED_BEARER))).rejects.toThrow(/404/);
+		await expect(listTools.call(fakeContext('http://unreachable.test', EXPECTED_BEARER))).rejects.toThrow(/Cannot reach/);
 	});
 });
