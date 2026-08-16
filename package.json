@@ -1,0 +1,69 @@
+{
+	"name": "n8n-nodes-guniweb-sap",
+	"version": "0.1.0",
+	"description": "n8n community node for SAP S/4HANA and ECC via the GuniWeb SAP MCP Server — OData V2/V4 query, read, create, update, delete, function imports, batch, IDoc over HTTP/XML — as deterministic workflow steps, no AI agent required",
+	"license": "MIT",
+	"homepage": "https://github.com/guniweb/n8n-nodes-guniweb-sap",
+	"keywords": [
+		"n8n-community-node-package",
+		"n8n",
+		"sap",
+		"s4hana",
+		"ecc",
+		"odata",
+		"idoc",
+		"mcp",
+		"erp",
+		"guniweb"
+	],
+	"author": {
+		"name": "GuniWeb",
+		"email": "support@guniweb.de"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/guniweb/n8n-nodes-guniweb-sap.git"
+	},
+	"bugs": {
+		"url": "https://github.com/guniweb/n8n-nodes-guniweb-sap/issues"
+	},
+	"engines": {
+		"node": ">=20.15"
+	},
+	"scripts": {
+		"build": "n8n-node build",
+		"build:watch": "tsc --watch",
+		"dev": "n8n-node dev",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"release": "n8n-node release",
+		"prepublishOnly": "n8n-node prerelease"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": true,
+		"credentials": [
+			"dist/credentials/GuniwebSapApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/GuniwebSap/GuniwebSap.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "^0.43.4",
+		"eslint": "9.39.4",
+		"n8n-workflow": "^2.16.0",
+		"prettier": "3.8.3",
+		"release-it": "20.2.0",
+		"typescript": "5.9.3",
+		"vitest": "^4.1.2"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}
