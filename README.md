@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/guniweb/n8n-nodes-guniweb-sap/main/icons/guniweb-sap.svg" width="88" height="88" align="right" alt="GuniWeb SAP node icon">
+
 # n8n-nodes-guniweb-sap
 
 SAP S/4HANA and SAP ECC as **deterministic workflow steps** in [n8n](https://n8n.io/) — query, read, create, update and delete OData entities (V2 and V4), call function imports and actions, run `$batch` requests, and send or track **IDocs over HTTP/XML** — no RFC SDK, no middleware, no AI agent required.
