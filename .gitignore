@@ -1,3 +1,17 @@
 dist
 node_modules
 *.png
+
+# Laufzeitprotokolle. Ein SAP-Connector legt dev_jco_rfc.log bzw. dev_rfc.trc
+# unaufgefordert neben dem Prozess ab; darin stehen Zielsystem, Route, Host,
+# Port und Zeitpunkte. Einmal eingecheckt, bleibt so etwas auch nach dem
+# Löschen in der Historie stehen.
+*.log
+logs/
+dev_jco*.log
+dev_rfc*.trc
+dev_w*
+npm-debug.log*
+
+# Build-Metadaten gehören weder ins Repo noch ins npm-Paket.
+*.tsbuildinfo
