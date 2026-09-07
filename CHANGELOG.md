@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-07
+
 ### Added
 
 - **Binary payloads: *Upload Media* and *Download Media*.** The node spoke JSON only, so SAP media entities — attachments, document images, archive documents — had to go around it through an HTTP Request node. That meant rebuilding four things the node already brings: the certificate chain (an intermediate alone is not enough for Node and OpenSSL, so a root CA credential of its own), the CSRF handshake with cookie forwarding, the client parameter, and the error classification. *Upload Media* sends a binary field of the incoming item as raw bytes, with the file name as the `Slug` header; *Download Media* writes the fetched bytes into a binary field instead of leaving a base64 string in the JSON. Needs GuniWeb SAP MCP Server 0.5.0 or newer.

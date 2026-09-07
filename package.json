@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-guniweb-sap",
-	"version": "0.1.2",
+	"version": "0.2.0",
 	"description": "n8n community node for SAP S/4HANA and ECC via the GuniWeb SAP MCP Server — OData V2/V4 query, read, create, update, delete, function imports, batch, IDoc over HTTP/XML — as deterministic workflow steps, no AI agent required",
 	"license": "MIT",
 	"homepage": "https://github.com/guniweb/n8n-nodes-guniweb-sap",

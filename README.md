@@ -148,7 +148,7 @@ Community: [issues](https://github.com/guniweb/n8n-nodes-guniweb-sap/issues) in 
 
 ## Version history
 
-- **0.2.0** (unreleased) — binary payloads: *Upload Media* and *Download Media* for SAP media entities (attachments, document images). Needs GuniWeb SAP MCP Server 0.5.0 or newer. Until now an attachment had to go around the node through an HTTP Request node, which meant rebuilding the certificate chain, the CSRF handshake, the client parameter and the error handling by hand.
+- **0.2.0** — binary payloads: *Upload Media* and *Download Media* for SAP media entities (attachments, document images). Needs GuniWeb SAP MCP Server 0.5.0 or newer. Until now an attachment had to go around the node through an HTTP Request node, which meant rebuilding the certificate chain, the CSRF handshake, the client parameter and the error handling by hand.
 - **0.1.0** — first release: OData (query/read/create/update/delete/function/batch), Discovery, IDoc, generic Tool resource; credential with connection test and optional personal SAP login (`user-basic` destinations).
 
 ## License
