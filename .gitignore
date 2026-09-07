@@ -15,3 +15,12 @@ npm-debug.log*
 
 # Build-Metadaten gehören weder ins Repo noch ins npm-Paket.
 *.tsbuildinfo
+
+# macOS
+.DS_Store
+
+# Interne Übergabe- und Projektnotizen. Dieses Repo ist öffentlich; solche
+# Dokumente nennen Kunden, Systeme und Ticketnummern und gehören nicht
+# hierher — einmal eingecheckt, bleiben sie auch nach dem Löschen in der
+# Historie stehen.
+docs/UEBERGABE-*.md
