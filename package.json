@@ -59,7 +59,7 @@
 		"eslint": "9.39.4",
 		"n8n-workflow": "^2.16.0",
 		"prettier": "3.9.6",
-		"release-it": "20.2.0",
+		"release-it": "21.0.2",
 		"typescript": "5.9.3",
 		"vitest": "^4.1.2"
 	},
