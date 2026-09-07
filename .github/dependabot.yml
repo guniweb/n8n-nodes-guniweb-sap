@@ -4,11 +4,24 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Ohne Obergrenze staut sich an, was niemand einzeln bewertet: im August
+    # lagen sechs Pull Requests gleichzeitig offen, fünf davon rot — und zwar
+    # aus einem Grund, der mit den Aktualisierungen nichts zu tun hatte.
+    open-pull-requests-limit: 5
     groups:
+      # Kleine Sprünge kommen gesammelt und sind eine Entscheidung, keine fünf.
       minor-and-patch:
         update-types: ["minor", "patch"]
+    # Hauptversionssprünge bleiben bewusst einzeln: typescript, eslint und
+    # release-it brechen auf verschiedene Weise, und gebündelt lässt sich nicht
+    # mehr sagen, welcher davon die Kette zerlegt hat.
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
+    open-pull-requests-limit: 3
+    groups:
+      # checkout und setup-node ziehen ohnehin gemeinsam weiter.
+      actions:
+        patterns: ["*"]
