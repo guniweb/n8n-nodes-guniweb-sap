@@ -131,6 +131,21 @@ npm run lint && npm test && npm run build
 SAP_MCP_URL=http://localhost:8808 SAP_MCP_TOKEN=gsm_… node scripts/smoke-real-server.mjs
 ```
 
+### Releasing
+
+Set the version in `package.json`, add the changelog entry, then push a tag **without** a `v`
+prefix — that is what the publish workflow listens for, and it publishes to npm with provenance:
+
+```bash
+git tag 0.3.0 && git push origin 0.3.0
+```
+
+`npm run release` (the interactive `n8n-node release`) does **not** work here: the CLI invokes
+release-it with `-n`, an option release-it 21 no longer knows. We stay on release-it 21 because
+release-it 20 pulls in an `undici` with a TLS certificate validation bypass, and the release path
+that matters — the workflow — never touches release-it: inside CI the CLI runs lint, build and
+`npm publish` directly.
+
 ## Compatibility
 
 Built and linted with `@n8n/node-cli` against n8n `2.x` (`n8n-workflow` peer dependency, `n8nNodesApiVersion: 1`). Requires GuniWeb SAP MCP Server ≥ 0.3.0 in HTTP transport (`--transport http`), ≥ 0.4.0 for the personal SAP login (`user-basic`); the legacy SSE transport is not supported. No runtime dependencies.
