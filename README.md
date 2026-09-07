@@ -52,6 +52,8 @@ The token is printed once; put it into the n8n credential (below). Server setup,
 | | Delete | `sap_delete` | |
 | | Call Function | `sap_function` | V2 function imports, V4 actions/functions (bound and unbound) |
 | | Batch | `sap_batch` | several operations in one `$batch` |
+| | Upload Media | `sap_media_upload` | a binary field as raw bytes into a media entity (attachment, document image) — file name as `Slug`, object headers as JSON |
+| | Download Media | `sap_media_download` | the raw bytes of a media entity into a binary field |
 | **Discovery** | Test Connection | `test-connection` | DNS → TLS → auth → client → catalog; a failed stage is returned as data, not thrown |
 | | Discover Services | `sap_discover_services` | search + business category, one item per service |
 | | List Entity Sets | `sap_list_services` | one item per entity set |
@@ -93,6 +95,31 @@ Errors from SAP arrive as node errors with the server's message, hint and next s
 
 Requires the server to run with `--allow-write` and a token without `readOnly`. Before automating document creation, settle the two questions the server documentation raises (write governance and SAP Digital Access) with your SAP team.
 
+**Attach a PDF to a sales order:**
+
+- Resource *OData*, Operation *Upload Media*
+- Service URL `/sap/opu/odata/sap/API_CV_ATTACHMENT_SRV`, Entity Set `AttachmentContentSet`
+- Input Binary Field `data` — file name and content type come from the binary metadata; *Upload Options* overrides either
+- Object Headers:
+
+```json
+{
+  "BusinessObjectTypeName": "BUS2032",
+  "LinkedSAPObjectKey": "{{ $json.salesOrder.padStart(10, '0') }}",
+  "DocumentInfoRecordDocType": "PDF"
+}
+```
+
+Three things decide whether this works:
+
+- **The object key goes out ten digits wide with leading zeros.** Sales order 4711 is `0000004711`.
+- **`BusinessObjectTypeName` must match the object.** A sales order is `BUS2032`. Get either wrong and SAP answers *"User has no authorization for operation 03 on object …"*, which is not about authorisations — the server's error message names both causes.
+- **Object Headers is a JSON field, not a pair list, because empty values must be omitted entirely.** A header sent empty makes SAP answer with the same misleading message. Leave a line out instead of setting it to `""`.
+
+There is no PATCH on this service: uploading again does not replace the first file, it attaches a second document to the same object. Verify with *Call Function* → `GetAllOriginals` before repeating an upload — that is a reading function import and works on a read-only connection too.
+
+The file travels base64-encoded inside the JSON-RPC request, so the server's request limit applies (16 MB of body, roughly a 12 MB file; `--max-request-bytes` raises it).
+
 **Anything else:** Resource *Tool* → *List Tools* shows what the server exposes for your token, *Call Tool* runs it with raw JSON arguments.
 
 ## Development
@@ -121,6 +148,7 @@ Community: [issues](https://github.com/guniweb/n8n-nodes-guniweb-sap/issues) in 
 
 ## Version history
 
+- **0.2.0** (unreleased) — binary payloads: *Upload Media* and *Download Media* for SAP media entities (attachments, document images). Needs GuniWeb SAP MCP Server 0.5.0 or newer. Until now an attachment had to go around the node through an HTTP Request node, which meant rebuilding the certificate chain, the CSRF handshake, the client parameter and the error handling by hand.
 - **0.1.0** — first release: OData (query/read/create/update/delete/function/batch), Discovery, IDoc, generic Tool resource; credential with connection test and optional personal SAP login (`user-basic` destinations).
 
 ## License

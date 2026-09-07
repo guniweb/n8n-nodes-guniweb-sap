@@ -219,3 +219,58 @@ export function compact(args: Record<string, unknown>): Record<string, unknown> 
 	}
 	return out;
 }
+
+export interface BinaryResource {
+	data: Buffer;
+	mimeType: string;
+	fileName?: string;
+}
+
+/**
+ * Holt die Rohbytes aus einem MCP-`resource`-Block mit `blob`.
+ *
+ * `sap_media_download` antwortet mit zwei Blöcken: einem Textblock mit
+ * Dateiname, Content-Type und Größe, und dem Blob selbst. Ohne diesen Weg
+ * fiele der Blob in den Sammelzweig von {@link toolResultToData} und käme als
+ * base64-Zeichenkette im JSON an — genau das, was die Binärform vermeiden soll.
+ */
+export function extractBinaryResource(result: McpToolResult): BinaryResource | undefined {
+	const block = (result.content ?? []).find(
+		(c) => c.type === 'resource' && typeof (c.resource as { blob?: unknown })?.blob === 'string',
+	);
+	if (!block) return undefined;
+
+	const resource = block.resource as { blob: string; mimeType?: string; uri?: string };
+	const found: BinaryResource = {
+		data: Buffer.from(resource.blob, 'base64'),
+		mimeType: resource.mimeType ?? 'application/octet-stream',
+	};
+
+	const fileName = fileNameFromResult(result) ?? lastUriSegment(resource.uri);
+	if (fileName) found.fileName = fileName;
+	return found;
+}
+
+/** Der Dateiname steht im Textblock — dort ist er unverstümmelt. */
+function fileNameFromResult(result: McpToolResult): string | undefined {
+	for (const block of result.content ?? []) {
+		if (block.type !== 'text' || typeof block.text !== 'string') continue;
+		const parsed = parseLoose(block.text);
+		if (parsed && typeof parsed === 'object') {
+			const name = (parsed as { fileName?: unknown }).fileName;
+			if (typeof name === 'string' && name.trim()) return name;
+		}
+	}
+	return undefined;
+}
+
+function lastUriSegment(uri: string | undefined): string | undefined {
+	if (!uri) return undefined;
+	const segment = uri.split('/').pop();
+	if (!segment) return undefined;
+	try {
+		return decodeURIComponent(segment);
+	} catch {
+		return segment;
+	}
+}

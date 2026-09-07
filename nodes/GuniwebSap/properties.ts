@@ -57,6 +57,12 @@ export const properties: INodeProperties[] = [
 				action: 'Delete an entity',
 			},
 			{
+				name: 'Download Media',
+				value: 'downloadMedia',
+				description: 'Download the raw bytes of a media entity (e.g. an attachment) into a binary field',
+				action: 'Download a media entity',
+			},
+			{
 				name: 'Query',
 				value: 'query',
 				description: 'Query an entity set with $filter, $select, $expand, $orderby, $top, $skip',
@@ -74,6 +80,12 @@ export const properties: INodeProperties[] = [
 				description: 'Update fields of an entity by key (ETag handled by the server)',
 				action: 'Update an entity',
 			},
+			{
+				name: 'Upload Media',
+				value: 'uploadMedia',
+				description: 'Upload a binary field as raw bytes into a media entity (e.g. an attachment)',
+				action: 'Upload to a media entity',
+			},
 		],
 		default: 'query',
 	},
@@ -88,7 +100,19 @@ export const properties: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				resource: ['odata', 'discovery'],
-				operation: ['query', 'read', 'create', 'update', 'delete', 'function', 'batch', 'listServices', 'getMetadata'],
+				operation: [
+					'query',
+					'read',
+					'create',
+					'update',
+					'delete',
+					'function',
+					'batch',
+					'uploadMedia',
+					'downloadMedia',
+					'listServices',
+					'getMetadata',
+				],
 			},
 		},
 	},
@@ -100,7 +124,7 @@ export const properties: INodeProperties[] = [
 		default: '',
 		placeholder: 'A_BusinessPartner',
 		description: 'Entity set name inside the service',
-		displayOptions: showOdata(['query', 'read', 'create', 'update', 'delete']),
+		displayOptions: showOdata(['query', 'read', 'create', 'update', 'delete', 'uploadMedia', 'downloadMedia']),
 	},
 	{
 		displayName: 'Key',
@@ -109,7 +133,7 @@ export const properties: INodeProperties[] = [
 		required: true,
 		default: '{\n  "BusinessPartner": "1000001"\n}',
 		description: 'Entity key as JSON object — one property per key field',
-		displayOptions: showOdata(['read', 'update', 'delete']),
+		displayOptions: showOdata(['read', 'update', 'delete', 'downloadMedia']),
 	},
 	{
 		displayName: 'Data',
@@ -129,6 +153,84 @@ export const properties: INodeProperties[] = [
 		default: '{\n  "BusinessPartnerName": "New Name"\n}',
 		description: 'Fields to update as JSON object',
 		displayOptions: showOdata(['update']),
+	},
+	{
+		displayName: 'Input Binary Field',
+		name: 'binaryPropertyName',
+		type: 'string',
+		required: true,
+		default: 'data',
+		placeholder: 'data',
+		hint: 'Name of the binary field on the incoming item that carries the file',
+		description:
+			'Which binary field of the incoming item holds the file. n8n names it "data" unless a previous node set something else.',
+		displayOptions: showOdata(['uploadMedia']),
+	},
+	{
+		displayName: 'Object Headers',
+		name: 'jsonHeaders',
+		type: 'json',
+		default:
+			'{\n  "BusinessObjectTypeName": "BUS2032",\n  "LinkedSAPObjectKey": "0000012345",\n  "DocumentInfoRecordDocType": "PDF"\n}',
+		description:
+			'Headers that tell SAP which object the file belongs to. A JSON object, because empty values must be omitted entirely — an empty header makes SAP answer with a message that reads like a missing authorisation and is none. LinkedSAPObjectKey goes out ten digits wide with leading zeros; a sales order is BUS2032.',
+		displayOptions: showOdata(['uploadMedia']),
+	},
+	{
+		displayName: 'Output Binary Field',
+		name: 'binaryPropertyName',
+		type: 'string',
+		required: true,
+		default: 'data',
+		placeholder: 'data',
+		description: 'Name of the binary field the downloaded file is written to',
+		displayOptions: showOdata(['downloadMedia']),
+	},
+	{
+		displayName: 'Upload Options',
+		name: 'uploadOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: showOdata(['uploadMedia']),
+		options: [
+			{
+				displayName: 'Content Type',
+				name: 'contentType',
+				type: 'string',
+				default: '',
+				placeholder: 'application/pdf',
+				description:
+					'Overrides the content type from the binary metadata. Leave empty to use what the incoming item carries.',
+			},
+			{
+				displayName: 'File Name',
+				name: 'fileName',
+				type: 'string',
+				default: '',
+				placeholder: 'auftragsbestaetigung.pdf',
+				description:
+					'Overrides the file name from the binary metadata. Goes out as the Slug header.',
+			},
+		],
+	},
+	{
+		displayName: 'Download Options',
+		name: 'downloadOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: showOdata(['downloadMedia']),
+		options: [
+			{
+				displayName: 'Request Without $Value Path',
+				name: 'withoutValuePath',
+				type: 'boolean',
+				default: false,
+				description:
+					'Whether to request the entity path without the trailing /$value. Only needed when the service serves the bytes directly under the entity path.',
+			},
+		],
 	},
 	{
 		displayName: 'Split Results Into Items',
