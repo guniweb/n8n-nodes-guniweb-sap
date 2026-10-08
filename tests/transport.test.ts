@@ -205,3 +205,54 @@ describe('transport against a fake SAP MCP Server', () => {
 		await expect(listTools.call(fakeContext('http://unreachable.test', EXPECTED_BEARER))).rejects.toThrow(/Cannot reach/);
 	});
 });
+
+// W3C Trace Context: an optional traceparent travels as a header to /mcp, so
+// the server can log it next to its correlationId.
+describe('traceparent', () => {
+	const TRACEPARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
+
+	function capturingContext() {
+		const seen: Array<Record<string, string>> = [];
+		const ctx = {
+			getNode: () => ({ name: 'GuniWeb SAP', type: 'guniwebSap', typeVersion: 1, position: [0, 0], parameters: {} }),
+			getCredentials: async () => ({ serverUrl: BASE, token: EXPECTED_BEARER, timeoutMs: 5000 }),
+			helpers: {
+				async httpRequestWithAuthentication(_cred: string, options: IHttpRequestOptions) {
+					seen.push({ ...((options.headers as Record<string, string>) ?? {}) });
+					return fakeServer(options, `Bearer ${EXPECTED_BEARER}`);
+				},
+			},
+		} as never;
+		return { ctx, seen };
+	}
+
+	it('sends the traceparent header on tools/call when set', async () => {
+		const { ctx, seen } = capturingContext();
+		await callTool.call(ctx, 'sap_query', {}, 0, { traceparent: TRACEPARENT });
+		expect(seen[0]?.traceparent).toBe(TRACEPARENT);
+	});
+
+	it('sends it on tools/list as well', async () => {
+		const { ctx, seen } = capturingContext();
+		await listTools.call(ctx, { traceparent: TRACEPARENT });
+		expect(seen[0]?.traceparent).toBe(TRACEPARENT);
+	});
+
+	it('trims the value and sends nothing when it is empty', async () => {
+		const { ctx, seen } = capturingContext();
+		await callTool.call(ctx, 'sap_query', {}, 0, { traceparent: `  ${TRACEPARENT} ` });
+		await callTool.call(ctx, 'sap_query', {}, 0, { traceparent: '   ' });
+		await callTool.call(ctx, 'sap_query', {}, 0);
+		expect(seen[0]?.traceparent).toBe(TRACEPARENT);
+		expect(seen[1]).not.toHaveProperty('traceparent');
+		expect(seen[2]).not.toHaveProperty('traceparent');
+	});
+
+	it('leaves the format check to the server, but never sends a line break', async () => {
+		const { ctx, seen } = capturingContext();
+		await callTool.call(ctx, 'sap_query', {}, 0, { traceparent: 'not-w3c' });
+		await callTool.call(ctx, 'sap_query', {}, 0, { traceparent: `${TRACEPARENT}\r\nX-Evil: 1` });
+		expect(seen[0]?.traceparent).toBe('not-w3c');
+		expect(seen[1]).not.toHaveProperty('traceparent');
+	});
+});

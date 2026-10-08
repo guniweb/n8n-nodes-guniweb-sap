@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Parameter *Trace Parent* (`traceparent`, W3C Trace Context).** Optional, Expression-fähig, bei allen Operationen. Ist er gesetzt, geht er als HTTP-Header `traceparent` an `/mcp`, und der Server (ab 0.7.0) schreibt die Trace-ID neben seine `correlationId` ins Protokoll. Ein Auftrag lässt sich so von der aufrufenden Anwendung bis zur SAP-Anfrage verfolgen. Die Formatprüfung macht der Server, ein ungültiger Wert wird dort ignoriert. Ein Wert mit Zeilenumbruch wird gar nicht erst gesendet. Ältere Server ignorieren den Header.
+
 ### Security
 
 - **`release-it` 20 → 21 schließt die letzte hohe Schwachstelle.** Über release-it 20 kam ein `undici` mit umgehbarer TLS-Zertifikatsprüfung, HTTP-Header-Injection und Cache-Poisoning ins Werkzeugumfeld (`npm audit`: 1 hohe, jetzt 0). Der Preis ist der interaktive Befehl `npm run release`: `@n8n/node-cli` ruft release-it mit `-n` auf, das es in 21 nicht mehr gibt. Der Weg, der zählt, ist davon unberührt — im CI führt die CLI `lint`, `build` und `npm publish` direkt aus, ohne release-it. Veröffentlicht wird künftig über einen Tag-Push, siehe README → Releasing.

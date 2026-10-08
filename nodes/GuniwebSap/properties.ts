@@ -725,4 +725,13 @@ export const properties: INodeProperties[] = [
 		description: 'Tool arguments as JSON object — see List Tools for the input schema',
 		displayOptions: { show: { resource: ['tool'], operation: ['call'] } },
 	},
+	{
+		displayName: 'Trace Parent',
+		name: 'traceparent',
+		type: 'string',
+		default: '',
+		placeholder: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+		description:
+			'Optional W3C Trace Context (traceparent) of the calling application. Sent as a header to the server, which logs its trace ID next to the correlation ID — so a job can be followed from the calling application to the SAP request. Logged only; an invalid value is ignored by the server. Needs server 0.7.0 or later to show up in the log.',
+	},
 ];

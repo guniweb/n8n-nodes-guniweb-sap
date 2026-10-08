@@ -127,8 +127,12 @@ async function runOperation(
 		const value = json(name);
 		return value === undefined ? undefined : JSON.stringify(value);
 	};
+	// W3C Trace Context of the workflow run; the server logs it next to its correlationId.
+	const traceparent = str('traceparent').trim() || undefined;
 	const call = async (tool: string, args: Record<string, unknown>, tolerateError = false) =>
-		toolResultToData(await callTool.call(this, tool, compact(args), i, { tolerateError }));
+		toolResultToData(
+			await callTool.call(this, tool, compact(args), i, { tolerateError, traceparent }),
+		);
 
 	// -----------------------------------------------------------------------
 	if (resource === 'odata') {
@@ -342,7 +346,7 @@ async function runOperation(
 	if (resource === 'tool') {
 		switch (operation) {
 			case 'list': {
-				const tools = await listTools.call(this);
+				const tools = await listTools.call(this, { traceparent });
 				return tools.map((t) => asObject(t));
 			}
 			case 'call': {
@@ -418,6 +422,7 @@ async function runDownloadMedia(
 			withoutValuePath: options.withoutValuePath === true ? true : undefined,
 		}),
 		i,
+		{ traceparent: String(this.getNodeParameter('traceparent', i, '') ?? '').trim() || undefined },
 	);
 
 	const binary = extractBinaryResource(result);

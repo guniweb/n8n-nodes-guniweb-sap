@@ -22,6 +22,17 @@ export const CREDENTIAL_NAME = 'guniwebSapApi';
 
 type Ctx = IExecuteFunctions | ILoadOptionsFunctions;
 
+/** Per-request extras that do not come from the credential. */
+export interface RequestOptions {
+	/**
+	 * W3C Trace Context of the calling workflow. Sent as the `traceparent`
+	 * header so the server logs the trace id next to its correlationId. The
+	 * format check is the server's job (it ignores an invalid value); a value
+	 * with a line break is dropped here, never sent.
+	 */
+	traceparent?: string;
+}
+
 interface FullResponse {
 	statusCode: number;
 	headers: Record<string, string | string[] | undefined>;
@@ -40,6 +51,7 @@ export async function mcpRequest(
 	method: string,
 	params?: Record<string, unknown>,
 	itemIndex?: number,
+	requestOptions: RequestOptions = {},
 ): Promise<unknown> {
 	const credentials = await this.getCredentials(CREDENTIAL_NAME);
 	if (!String(credentials.serverUrl ?? '').trim()) {
@@ -60,6 +72,10 @@ export async function mcpRequest(
 	if (sapUsername && sapPassword) {
 		headers['X-SAP-Username'] = sapUsername;
 		headers['X-SAP-Password'] = sapPassword;
+	}
+	const traceparent = String(requestOptions.traceparent ?? '').trim();
+	if (traceparent && !/[\r\n]/.test(traceparent)) {
+		headers.traceparent = traceparent;
 	}
 	const options: IHttpRequestOptions = {
 		method: 'POST',
@@ -178,11 +194,17 @@ export async function mcpRequest(
 }
 
 /** `tools/list` → tool descriptors (paged; follows nextCursor). */
-export async function listTools(this: Ctx): Promise<McpToolInfo[]> {
+export async function listTools(this: Ctx, requestOptions: RequestOptions = {}): Promise<McpToolInfo[]> {
 	const tools: McpToolInfo[] = [];
 	let cursor: string | undefined;
 	do {
-		const result = (await mcpRequest.call(this, 'tools/list', cursor ? { cursor } : undefined)) as
+		const result = (await mcpRequest.call(
+			this,
+			'tools/list',
+			cursor ? { cursor } : undefined,
+			undefined,
+			requestOptions,
+		)) as
 			| { tools?: McpToolInfo[]; nextCursor?: string }
 			| undefined;
 		tools.push(...(result?.tools ?? []));
@@ -200,13 +222,14 @@ export async function callTool(
 	name: string,
 	args: Record<string, unknown>,
 	itemIndex?: number,
-	options: { tolerateError?: boolean } = {},
+	options: { tolerateError?: boolean } & RequestOptions = {},
 ): Promise<McpToolResult> {
 	const result = (await mcpRequest.call(
 		this,
 		'tools/call',
 		{ name, arguments: args },
 		itemIndex,
+		{ traceparent: options.traceparent },
 	)) as McpToolResult;
 	// Diagnostic tools (test-connection) report a failed check as isError —
 	// for the workflow that is a result to look at, not a crash.
