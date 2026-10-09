@@ -167,6 +167,7 @@ Community: [issues](https://github.com/guniweb/n8n-nodes-guniweb-sap/issues) in 
 
 ## Version history
 
+- **0.3.0** — optional *Trace Parent* parameter: a W3C `traceparent` sent as HTTP header to `/mcp`, so the server (0.7.0 or newer) writes the trace ID next to its `correlationId`. A job can then be followed from the calling application through n8n to the SAP request. Older servers ignore the header.
 - **0.2.0** — binary payloads: *Upload Media* and *Download Media* for SAP media entities (attachments, document images). Needs GuniWeb SAP MCP Server 0.5.0 or newer. Until now an attachment had to go around the node through an HTTP Request node, which meant rebuilding the certificate chain, the CSRF handshake, the client parameter and the error handling by hand.
 - **0.1.0** — first release: OData (query/read/create/update/delete/function/batch), Discovery, IDoc, generic Tool resource; credential with connection test and optional personal SAP login (`user-basic` destinations).
 
