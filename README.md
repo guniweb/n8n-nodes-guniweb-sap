@@ -120,6 +120,10 @@ There is no PATCH on this service: uploading again does not replace the first fi
 
 The file travels base64-encoded inside the JSON-RPC request, so the server's request limit applies (16 MB of body, roughly a 12 MB file; `--max-request-bytes` raises it).
 
+**Follow a job across systems (W3C Trace Context):**
+
+Set *Trace Parent* to the `traceparent` your calling application created for the job, e.g. `{{ $json.traceparent }}`. The node sends it as a `traceparent` header, and the server writes its trace ID into the log line of every tool call, next to its own correlation ID. One `grep` on the trace ID then leads from the calling application to the SAP request. The value is only logged. The server checks the format and ignores an invalid value, so a typo never breaks a workflow. Leave the field empty if you do not trace.
+
 **Anything else:** Resource *Tool* → *List Tools* shows what the server exposes for your token, *Call Tool* runs it with raw JSON arguments.
 
 ## Development
@@ -148,7 +152,7 @@ that matters — the workflow — never touches release-it: inside CI the CLI ru
 
 ## Compatibility
 
-Built and linted with `@n8n/node-cli` against n8n `2.x` (`n8n-workflow` peer dependency, `n8nNodesApiVersion: 1`). Requires GuniWeb SAP MCP Server ≥ 0.3.0 in HTTP transport (`--transport http`), ≥ 0.4.0 for the personal SAP login (`user-basic`); the legacy SSE transport is not supported. No runtime dependencies.
+Built and linted with `@n8n/node-cli` against n8n `2.x` (`n8n-workflow` peer dependency, `n8nNodesApiVersion: 1`). Requires GuniWeb SAP MCP Server ≥ 0.3.0 in HTTP transport (`--transport http`), ≥ 0.4.0 for the personal SAP login (`user-basic`), ≥ 0.7.0 for the trace ID in the server log (older servers ignore the header); the legacy SSE transport is not supported. No runtime dependencies.
 
 ## Resources
 
