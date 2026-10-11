@@ -33,6 +33,28 @@ function fakeServer(options: IHttpRequestOptions, authorization: string | undefi
 	if (url.pathname !== '/mcp') {
 		return { statusCode: 404, headers: {}, body: JSON.stringify({ error: 'Not Found' }) };
 	}
+	// Rate limits: the server's call limit (#73) and the brake on failed logins.
+	if (url.hostname === 'call-limited.test') {
+		return {
+			statusCode: 429,
+			headers: { 'retry-after': '12' },
+			body: JSON.stringify({
+				error: 'Too Many Requests',
+				reason: 'call-rate-limit',
+				scope: 'token',
+				limit: { requestsPerMinute: 30 },
+				retryAfterSeconds: 12,
+				hint: 'Die Ratenbegrenzung dieses Tokens ist erreicht (höchstens 30 Aufrufe je Minute). Nach 12 s erneut versuchen.',
+			}),
+		};
+	}
+	if (url.hostname === 'auth-limited.test') {
+		return {
+			statusCode: 429,
+			headers: { 'retry-after': '40' },
+			body: JSON.stringify({ error: 'Too Many Requests', retryAfterSeconds: 40 }),
+		};
+	}
 	if (authorization !== `Bearer ${EXPECTED_BEARER}`) {
 		return { statusCode: 401, headers: {}, body: JSON.stringify({ error: 'Unauthorized' }) };
 	}
@@ -198,6 +220,24 @@ describe('transport against a fake SAP MCP Server', () => {
 		const ctx = fakeContext(url, EXPECTED_BEARER, { sapUsername: 'MUELLER' });
 		const result = (await mcpRequest.call(ctx, 'whoami')) as { sapUser: string | null };
 		expect(result.sapUser).toBeNull();
+	});
+
+	it('explains the call rate limit (429 call-rate-limit) with the server hint and the wait time', async () => {
+		const error = await callTool
+			.call(fakeContext('http://call-limited.test:8808', EXPECTED_BEARER), 'sap_query', {})
+			.catch((e: unknown) => e as { message: string; description?: string });
+		expect(error.message).toMatch(/rate limit of this token.*429/);
+		expect(error.description).toContain('höchstens 30 Aufrufe je Minute');
+		expect(error.description).toContain('12 seconds');
+	});
+
+	it('keeps the failed-login explanation for a 429 without call-rate-limit', async () => {
+		const error = await listTools
+			.call(fakeContext('http://auth-limited.test:8808', EXPECTED_BEARER))
+			.catch((e: unknown) => e as { message: string; description?: string });
+		expect(error.message).toMatch(/rate-limiting this address \(429\)/);
+		expect(error.description).toContain('failed authentications');
+		expect(error.description).toContain('40 seconds');
 	});
 
 	it('reports 404 for a wrong path and connection errors for a wrong host', async () => {

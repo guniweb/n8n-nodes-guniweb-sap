@@ -130,6 +130,20 @@ export async function mcpRequest(
 	}
 	if (response.statusCode === 429) {
 		const retry = response.headers?.['retry-after'];
+		const body = parseJsonLoose(response.body);
+		// Server >= 0.9: a configured limit on tool calls per token or destination.
+		if (body?.reason === 'call-rate-limit') {
+			const scope = body.scope === 'destination' ? 'this SAP destination' : 'this token';
+			const hint = typeof body.hint === 'string' ? `${body.hint} ` : '';
+			throw new NodeOperationError(
+				this.getNode(),
+				`The SAP MCP Server rate limit of ${scope} is reached (429).`,
+				{
+					description: `${hint}Retry after ${retry ?? 'a few'} seconds — e.g. with "Retry On Fail" and a wait between tries, or slow down the loop that calls this node.`,
+					itemIndex,
+				},
+			);
+		}
 		throw new NodeOperationError(
 			this.getNode(),
 			'The SAP MCP Server is rate-limiting this address (429).',
