@@ -131,7 +131,7 @@ export async function mcpRequest(
 	if (response.statusCode === 429) {
 		const retry = response.headers?.['retry-after'];
 		const body = parseJsonLoose(response.body);
-		// Server >= 0.9: a configured limit on tool calls per token or destination.
+		// Server with rate limits (guniweb-sap-mcp #73): a configured limit on tool calls per token or destination.
 		if (body?.reason === 'call-rate-limit') {
 			const scope = body.scope === 'destination' ? 'this SAP destination' : 'this token';
 			const hint = typeof body.hint === 'string' ? `${body.hint} ` : '';
