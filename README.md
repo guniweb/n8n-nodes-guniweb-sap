@@ -141,7 +141,7 @@ Set the version in `package.json`, add the changelog entry, then push a tag **wi
 prefix — that is what the publish workflow listens for, and it publishes to npm with provenance:
 
 ```bash
-git tag 0.3.0 && git push origin 0.3.0
+git tag 0.3.1 && git push origin 0.3.1
 ```
 
 `npm run release` (the interactive `n8n-node release`) does **not** work here: the CLI invokes
@@ -167,6 +167,7 @@ Community: [issues](https://github.com/guniweb/n8n-nodes-guniweb-sap/issues) in 
 
 ## Version history
 
+- **0.3.1** — a `429` from the server's rate limit (server 0.9.0 or newer, `reason: "call-rate-limit"`) now names the limit that was reached (token or SAP destination), with the server's hint and the wait from `Retry-After`. Until now every `429` read as "too many failed authentications".
 - **0.3.0** — optional *Trace Parent* parameter: a W3C `traceparent` sent as HTTP header to `/mcp`, so the server (0.7.0 or newer) writes the trace ID next to its `correlationId`. A job can then be followed from the calling application through n8n to the SAP request. Older servers ignore the header.
 - **0.2.0** — binary payloads: *Upload Media* and *Download Media* for SAP media entities (attachments, document images). Needs GuniWeb SAP MCP Server 0.5.0 or newer. Until now an attachment had to go around the node through an HTTP Request node, which meant rebuilding the certificate chain, the CSRF handshake, the client parameter and the error handling by hand.
 - **0.1.0** — first release: OData (query/read/create/update/delete/function/batch), Discovery, IDoc, generic Tool resource; credential with connection test and optional personal SAP login (`user-basic` destinations).

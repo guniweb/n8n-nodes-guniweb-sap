@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-15
+
 ### Changed
 
 - **Verständliche Meldung bei der Ratenbegrenzung des Servers.** Mit guniweb-sap-mcp #73 lassen sich Werkzeugaufrufe je Token oder Destination begrenzen (guniweb-sap-mcp #73). Über der Grenze antwortet der Server mit 429 und `reason: "call-rate-limit"`. Der Node meldet das jetzt als erreichte Grenze des Tokens bzw. der SAP-Destination, mit dem Hinweis des Servers und der Wartezeit aus `Retry-After`. Bisher erschien jede 429 als „zu viele fehlgeschlagene Anmeldungen“. Diese Meldung bleibt für die Anmeldebremse erhalten.
